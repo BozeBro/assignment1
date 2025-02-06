@@ -279,6 +279,25 @@ class DivByConstOp(Op):
         return [output_grad / node.constant]
 
 
+class TransposeOp(Op):
+    """
+    Matrix Transposition op of one node
+    """
+
+    def __call__(self, node_A) -> Node:
+        return Node(
+            inputs=[node_A],
+            op=self,
+            name=f"({node_A.name}.T)",
+        )
+
+    def compute(self, node: Node, input_values: List[np.ndarray]) -> np.ndarray:
+        return input_values[0].T
+
+    def gradient(self, node: Node, output_grad: Node) -> List[Node]:
+        return [output_grad]
+
+
 class MatMulOp(Op):
     """Matrix multiplication op of two nodes."""
 
@@ -338,15 +357,12 @@ class MatMulOp(Op):
         trans_B = node.attrs["trans_B"]
         if trans_A and trans_B:
             return [
-                matmul(node.inputs[1], output_grad, trans_A=True),
-                matmul(output_grad, node.inputs[0], trans_B=True),
+                matmul(node.inputs[1], output_grad, trans_A=True, trans_B=True),
+                matmul(output_grad, node.inputs[0], trans_B=True, trans_A=True),
             ]
         elif trans_A:
             return [
-                matmul(
-                    node.inputs[1],
-                    output_grad,
-                ),
+                matmul(node.inputs[1], output_grad, trans_B=True),
                 matmul(
                     node.inputs[0],
                     output_grad,
@@ -355,10 +371,7 @@ class MatMulOp(Op):
         elif trans_B:
             return [
                 matmul(output_grad, node.inputs[1]),
-                matmul(
-                    output_grad,
-                    node.inputs[0],
-                ),
+                matmul(output_grad, node.inputs[0], trans_A=True),
             ]
         else:
             return [
