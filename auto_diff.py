@@ -369,6 +369,25 @@ class MatMulOp(Op):
             ]
 
 
+class Broadcast(Op):
+    def __call__(self, node_A: Node, node_B: Node) -> Node:
+        return Node(
+            inputs=[node_A, node_B],
+            op=self,
+            name=f"Broadcast({node_A.name},{node_B.name})",
+        )
+
+    def compute(self, node: Node, input_values: List[np.ndarray]) -> np.ndarray:
+        """Return an all-zero tensor with the same shape as input."""
+        assert len(input_values) == 2
+        return np.broadcast_to(input_values[1], input_values[0].shape)
+
+    def gradient(self, node: Node, output_grad: Node) -> List[Node]:
+        return [
+            matmul(output_grad, ones_like(node.inputs[1]), trans_A=True, trans_B=True)
+        ]
+
+
 class ZerosLikeOp(Op):
     """Zeros-like op that returns an all-zero array with the same shape as the input."""
 
@@ -410,6 +429,7 @@ mul_by_const = MulByConstOp()
 div_by_const = DivByConstOp()
 matmul = MatMulOp()
 zeros_like = ZerosLikeOp()
+broadcast = Broadcast()
 ones_like = OnesLikeOp()
 
 
@@ -425,8 +445,6 @@ def topological_sort(sink_node: Node) -> List[Node]:
 
     while stack:
         node = stack.pop()
-        if type(node) == int:
-            continue
         result.append(node)
         stack.extend(node.inputs)
 
@@ -470,8 +488,6 @@ class Evaluator:
             for output_node in self.eval_nodes
             for node in topological_sort(output_node)
         ]
-        for a, b in input_values.items():
-            print(str(a), b)
         nodeToVal = {}
         for node, value in input_values.items():
             nodeToVal[node] = value
@@ -486,18 +502,7 @@ class Evaluator:
                 node, [nodeToVal[input_node] for input_node in node.inputs]
             )
             nodeToVal[node] = output_value
-
         return [nodeToVal[node] for node in self.eval_nodes]
-
-
-def my_sum(arr):
-    if not arr:
-        raise Exception("Empty array")
-    partial_sum = arr[0]
-    for node in arr[1:]:
-        partial_sum = partial_sum + node
-
-    return partial_sum
 
 
 def gradients(output_node: Node, nodes: List[Node]) -> List[Node]:
@@ -519,26 +524,17 @@ def gradients(output_node: Node, nodes: List[Node]) -> List[Node]:
         A list of gradient nodes, one for each input nodes respectively.
     """
     node_to_grad = defaultdict(list)
-    node_to_grad[output_node] = [1]
+    node_to_grad[output_node] = [ones_like(output_node)]
     adjoints = {}
-    objs = list(reversed(topological_sort(output_node)))
-    [print(obj) for obj in objs]
 
-    for i in objs:
-        vi_bar = my_sum(node_to_grad[i])
-        adjoints[i] = vi_bar
-
-        if not isinstance(i, Node) or isinstance(i, Variable):
+    for i in reversed(topological_sort(output_node)):
+        adjoints[i] = sum(node_to_grad[i])
+        if isinstance(i, Variable):
             continue
-        # only operator are allowed to add to node_to_grad
 
         i_grads = i.op.gradient(i, adjoints[i])
 
         for k, grad in zip(i.inputs, i_grads):
-            vk_i = grad * vi_bar
-            node_to_grad[k].append(vk_i)
-    print("Start")
-    [print(adjoints[i], i) for i in nodes]
-    print("End")
+            node_to_grad[k].append(grad)
 
-    return [adjoints[i] for i in nodes]
+    return [adjoints.get(i, zeros_like(i)) for i in nodes]

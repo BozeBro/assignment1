@@ -29,7 +29,7 @@ def logistic_regression(X: ad.Node, W: ad.Node, b: ad.Node) -> ad.Node:
         The logits predicted for the batch of input.
         When evaluating, it should have shape (batch_size, num_classes).
     """
-    """TODO: Your code here"""
+    return ad.add(ad.matmul(X, W), ad.broadcast(b))
 
 
 def softmax_loss(Z: ad.Node, y_one_hot: ad.Node, batch_size: int) -> ad.Node:
