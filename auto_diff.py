@@ -1,5 +1,6 @@
 # from attr import attrs
 from typing import Any, Dict, List
+from collections import defaultdict
 
 import numpy as np
 
@@ -342,10 +343,11 @@ class MatMulOp(Op):
         """
         trans_A = node.attrs["trans_A"]
         trans_B = node.attrs["trans_B"]
+
         if trans_A and trans_B:
             return [
-                matmul(node.inputs[1], output_grad, trans_A=True, trans_B=True),
-                matmul(output_grad, node.inputs[0], trans_B=True, trans_A=True),
+                matmul(node.inputs[1], output_grad, trans_A=True),
+                matmul(output_grad, node.inputs[0], trans_B=True),
             ]
         elif trans_A:
             return [
@@ -423,6 +425,8 @@ def topological_sort(sink_node: Node) -> List[Node]:
 
     while stack:
         node = stack.pop()
+        if type(node) == int:
+            continue
         result.append(node)
         stack.extend(node.inputs)
 
@@ -486,6 +490,16 @@ class Evaluator:
         return [nodeToVal[node] for node in self.eval_nodes]
 
 
+def my_sum(arr):
+    if not arr:
+        raise Exception("Empty array")
+    partial_sum = arr[0]
+    for node in arr[1:]:
+        partial_sum = partial_sum + node
+
+    return partial_sum
+
+
 def gradients(output_node: Node, nodes: List[Node]) -> List[Node]:
     """Construct the backward computational graph, which takes gradient
     of given output node with respect to each node in input list.
@@ -504,5 +518,27 @@ def gradients(output_node: Node, nodes: List[Node]) -> List[Node]:
     grad_nodes: List[Node]
         A list of gradient nodes, one for each input nodes respectively.
     """
+    node_to_grad = defaultdict(list)
+    node_to_grad[output_node] = [1]
+    adjoints = {}
+    objs = list(reversed(topological_sort(output_node)))
+    [print(obj) for obj in objs]
 
-    """TODO: Your code here"""
+    for i in objs:
+        vi_bar = my_sum(node_to_grad[i])
+        adjoints[i] = vi_bar
+
+        if not isinstance(i, Node) or isinstance(i, Variable):
+            continue
+        # only operator are allowed to add to node_to_grad
+
+        i_grads = i.op.gradient(i, adjoints[i])
+
+        for k, grad in zip(i.inputs, i_grads):
+            vk_i = grad * vi_bar
+            node_to_grad[k].append(vk_i)
+    print("Start")
+    [print(adjoints[i], i) for i in nodes]
+    print("End")
+
+    return [adjoints[i] for i in nodes]
