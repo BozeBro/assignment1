@@ -50,14 +50,9 @@ def test_gradient_of_gradient():
     x2 = ad.Variable(name="x2")
     y = x1 * x1 + x1 * x2
 
-    print("Start 1")
     grad_x1, grad_x2 = ad.gradients(y, [x1, x2])
-    print("Start 2")
     grad_x1_x1, grad_x1_x2 = ad.gradients(grad_x1, [x1, x2])
-    print("grad_x1_x1", grad_x1_x1)
-    print("Start 3")
     grad_x2_x1, grad_x2_x2 = ad.gradients(grad_x2, [x1, x2])
-    print("Start 4")
 
     evaluator = ad.Evaluator(
         [y, grad_x1, grad_x2, grad_x1_x1, grad_x1_x2, grad_x2_x1, grad_x2_x2]
@@ -78,6 +73,17 @@ def test_gradient_of_gradient():
             np.zeros((2, 4), "float32"),
         ],
     )
+
+
+# def test():
+#     X = ad.Variable(name="X")
+#     W = ad.Variable(name="W")
+#     b = ad.Variable(name="b")
+#     mat = ad.matmul(X, W)
+#     B = ad.Broadcast(b)
+#
+#     Z = mat + B
+#     grad_x, grad_xb = ad.gradients(Z, [X, b])
 
 
 if __name__ == "__main__":

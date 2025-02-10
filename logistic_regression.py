@@ -29,7 +29,8 @@ def logistic_regression(X: ad.Node, W: ad.Node, b: ad.Node) -> ad.Node:
         The logits predicted for the batch of input.
         When evaluating, it should have shape (batch_size, num_classes).
     """
-    return ad.add(ad.matmul(X, W), ad.broadcast(b))
+    mult = ad.matmul(X, W)
+    return ad.add(mult, ad.broadcast(b, mult))
 
 
 def softmax_loss(Z: ad.Node, y_one_hot: ad.Node, batch_size: int) -> ad.Node:
@@ -63,7 +64,15 @@ def softmax_loss(Z: ad.Node, y_one_hot: ad.Node, batch_size: int) -> ad.Node:
     softmax loss function usually does not take the batch size as input.
     Try to think about why our softmax loss may need the batch size.
     """
-    """TODO: Your code here"""
+
+    exp = ad.exp(Z)
+    z_y_mat = Z * y_one_hot
+
+    shrunk_y = ad.shrink(z_y_mat)
+    shrunk_sum = ad.shrink(exp)
+    log_sum = ad.log(shrunk_sum)
+
+    return ad.summation(log_sum - shrunk_y) / batch_size
 
 
 def sgd_epoch(
