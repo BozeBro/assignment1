@@ -39,7 +39,7 @@ def check_evaluator_output(
         np.testing.assert_allclose(actual=output_val, desired=expected_val)
 
 
-def test_mul():
+def test_softmax():
     X = ad.Variable("X")
     y_hot = ad.Variable("y_hot")
     y = softmax_loss(X, y_hot, 2)
@@ -57,4 +57,4 @@ def test_mul():
 
 
 if __name__ == "__main__":
-    test_mul()
+    test_softmax()
